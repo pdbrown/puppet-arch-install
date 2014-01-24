@@ -1,0 +1,6 @@
+arch_laptop_install::grub::grub_cmdline_linux: "cryptdevice=<%= ENV['CRYPT_DEV'] %>:<%= ENV['PLAIN_PART_NAME'] %> rootflags=subvol=<%= ENV['BTRFS_ROOT_VOL'] %>"
+arch_laptop_install::grub::grub_install_device: "<%= ENV['GRUB_INSTALL_DEV'] %>"
+
+arch_laptop_install::hostname::hostname: "<%= ENV['HOSTNAME'] %>"
+
+arch_laptop::network_core::wired_interface: "<%= ENV['WIRED_IF'] %>"

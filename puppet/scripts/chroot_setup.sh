@@ -1,7 +1,7 @@
 #!/bin/bash
 root_dir=$(cd $(dirname "$0") && pwd)
-module_path=/root/puppet/modules
-hieradata_path=/root/puppet/hieradata
+module_path="${root_dir}/../modules"
+hieradata_path="${root_dir}/../hieradata"
 module=arch_laptop_install
 tmp_pp_dir="${root_dir}/init_pp"
 

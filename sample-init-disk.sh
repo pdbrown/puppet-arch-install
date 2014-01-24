@@ -19,5 +19,5 @@ sector_size=$(cat "/sys/block/${disk_name}/queue/physical_block_size")
 # (zero based addressing)
 max=$(( $(cat "/sys/block/${disk_name}/size") * $sector_size / 1024 / 1024 - 1 ))
 # Parted default unit is MB, start at 1 for proper SSD alignment
-parted -s /dev/sda/ mkpart primary 1 500
-parted -s /dev/sda/ mkpart primary 500 $max
+parted -s /dev/${disk_name} mkpart primary 1 500
+parted -s /dev/${disk_name} mkpart primary 500 $max

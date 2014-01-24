@@ -54,8 +54,8 @@ fi
 
 # Load partition config
 source "${root_dir}/config.sh"
-[ -f $boot_part ] || die "\$boot_part: '${boot_part}' does not exist. See ${root_dir}/config.sh"
-[ -f $enc_part  ] || die "\$enc_part: '${enc_part}' does not exist. See ${root_dir}/config.sh"
+[ -b $boot_part ] || die "\$boot_part: '${boot_part}' does not exist. See ${root_dir}/config.sh"
+[ -b $enc_part  ] || die "\$enc_part: '${enc_part}' does not exist. See ${root_dir}/config.sh"
 echo "Arch installer configured with:"
 echo "boot_part=${boot_part}"
 echo "enc_part=${enc_part}"
@@ -66,33 +66,39 @@ if [ "$install_flag" != y ] && [ "$install_flag" != Y ]; then
   exit 2
 fi
 
-boot_disk=$(echo ${boot_partition} | tr -d '[0-9]')
+boot_disk=$(echo ${boot_part} | tr -d '[0-9]')
 boot_disk_name=$(basename ${boot_disk})
-boot_part_num=$(basename ${boot_partition} | tr -d '[a-z]')
+boot_part_num=$(basename ${boot_part} | tr -d '[a-z]')
 
-plain_name="$(basename ${enc_part})_crypt"
-plain_part="/dev/mapper/${enc_part_name}"
+enc_part_name=$(basename ${enc_part})
+
+plain_part_name="${enc_part_name}_crypt"
+plain_part="/dev/mapper/${plain_part_name}"
+
+btrfs_root_vol=@
 
 # Create unencrypted /boot fs
 mkfs.ext4 ${boot_part}
 
 # Encrypt root device
 cryptsetup --use-random luksFormat ${enc_part}
-cryptsetup open ${enc_part} ${plain_name}
+cryptsetup open ${enc_part} ${plain_part_name}
 
 # Create btrfs tank on plaintext partition, prepare subvolumes
 mkfs.btrfs -L tank ${plain_part}
 mount ${plain_part} /mnt
-btrfs subvolume create /mnt/@
+btrfs subvolume create /mnt/${btrfs_root_vol}
 btrfs subvolume create /mnt/@var
 btrfs subvolume create /mnt/@home
+umount /mnt
 
 # Mount partitions
-mount ${plain_part} -o subvol=@ /mnt
+mount ${plain_part} -o subvol=${btrfs_root_vol} /mnt
 mkdir /mnt/var /mnt/home /mnt/boot
 
 mount ${plain_part} -o subvol=@var /mnt/var
 mount ${plain_part} -o subvol=@home /mnt/home
+mount ${boot_part} /mnt/boot
 
 
 ###############################################################################
@@ -100,81 +106,23 @@ mount ${plain_part} -o subvol=@home /mnt/home
 ###############################################################################
 
 sed -i 's/#\(XferCommand.*curl.*\)/\1/' /etc/pacman.conf
-pacstrap -i /mnt base
+pacstrap /mnt base
 
 # Generate fstab
 genfstab -p -U /mnt >> /mnt/etc/fstab
 
 
 ###############################################################################
-# System setup
-#
-# Installs:
-#   * base-devel
-#   * git
-#   * package-query
-#   * yaourt
-#   * puppet
+# System setup prep
 ###############################################################################
 
-arch-chroot /mnt /bin/bash
-
-passwd
-
-# update system, get git
-pacman --noconfirm -Syu
-pacman --noconfirm -S --needed base-devel
-pacman --noconfirm -S git
-
-# get package-query, yaourt, puppet
-mkdir ~/builds
-cd ~/builds
-curl -O https://aur.archlinux.org/packages/pa/package-query/package-query.tar.gz
-curl -O https://aur.archlinux.org/packages/ya/yaourt/yaourt.tar.gz
-tar xf package-query.tar.gz
-tar xf yaourt.tar.gz
-cd package-query
-makepkg -s
-cd ..
-cd yaourt
-makepkg -s
-cd ..
-yaourt puppet
-
-
-###############################################################################
-# Full system configuration with puppet
-#
-# Examine puppet-arch-install/puppet for details
-###############################################################################
-
-
-#TODO render hieradata template
-#enc_part_uuid=$(ls -l /dev/disk/by-uuid/ | grep ${root_part} | awk '{print $(NF-2)}')
-#sed -i 's|\(GRUB_CMDLINE_LINUX\)=.*|\1="cryptdevice=/dev/disk/by-uuid/'${enc_part_uuid}':cryptroot"| /etc/default/grub'
-#hostname
-#TODO Run chroot_setup.sh
-
-
-# TODO in arch_laptop_install module:
-# SUDO
-# USER phil
-# ADD to sudoers
-#salt=$(dd if=/dev/urandom | tr -dc '[:alnum:]' | head -c 16)
-## allow members of group 'sudo' to use sudo
-#sed -i 's/.*%\(sudo\s\+ALL=(ALL) ALL\)/\1/' /etc/sudoers
-
-# Reboot
-# Run all puppet modules
-
-# TODO:
-# wifi
-# template grub config cryptdevice
-# template grub install device
-# sysctl, harden kernel
-# sysctl, deadline scheduler
-# firewall
-
-# profile-sync-daemon in aur
-# X
-# xmonad
+chroot_scripts=/mnt/root/puppet-arch-install
+bootstrap=${chroot_scripts}/chroot-puppet-bootstrap.sh
+cp -r ${root_dir} ${chroot_scripts}
+crypt_dev_uuid=$(lsblk -o NAME,UUID | grep ${enc_part_name} | grep -v ${plain_part_name} | awk '{print $2}')
+sed -i 's|^crypt_dev=$|&'/dev/disk/by-uuid/${crypt_dev_uuid}'|' ${bootstrap}
+sed -i 's|^plain_part_name=$|&'${plain_part_name}'|' ${bootstrap}
+sed -i 's|^btrfs_root_vol=$|&'${btrfs_root_vol}'|' ${bootstrap}
+sed -i 's|^grub_install_dev=$|&'${boot_disk}'|' ${bootstrap}
+chmod u+x ${bootstrap}
+arch-chroot /mnt /bin/bash -c /root/puppet-arch-install/chroot-puppet-bootstrap.sh

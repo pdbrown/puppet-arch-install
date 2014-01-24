@@ -1,4 +1,7 @@
-class arch_laptop::network_core {
+class arch_laptop::network_core ($wired_interface) {
+
+  $dhcp_service = "dhcpcd@${wired_interface}.service"
+
   package {'openresolv':
     ensure => present,
     before => File['/etc/resolvconf.conf'],
@@ -6,6 +9,21 @@ class arch_laptop::network_core {
   file {'/etc/resolvconf.conf':
     ensure  => file,
     source  => "puppet:///modules/arch_laptop/network/resolvconf.conf",
+  }
+
+  package {'dhcpcd':
+    ensure => present,
+    before => File['/etc/dhcpcd.conf'],
+  }
+  file {'/etc/dhcpcd.conf':
+    ensure  => file,
+    source  => "puppet:///modules/arch_laptop/network/dhcpcd.conf",
+  }
+  service {"$dhcp_service":
+    ensure    => running,
+    enable    => true,
+    subscribe => [File['/etc/dhcpcd.conf'],
+                  File['/etc/resolvconf.conf']],
   }
 
   package {'dnsmasq':
@@ -19,16 +37,8 @@ class arch_laptop::network_core {
   service {'dnsmasq':
     ensure    => running,
     enable    => true,
-    subscribe => File['/etc/dnsmasq.conf'],
-  }
-
-  package {'dhcpcd':
-    ensure => present,
-    before => File['/etc/dhcpcd.conf'],
-  }
-  file {'/etc/dhcpcd.conf':
-    ensure  => file,
-    source  => "puppet:///modules/arch_laptop/network/dhcpcd.conf",
+    subscribe => [File['/etc/dnsmasq.conf'],
+                  Service["$dhcp_service"]],
   }
 
   package {'openssh':

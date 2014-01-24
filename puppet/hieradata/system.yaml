@@ -1,6 +1,0 @@
-arch_laptop_install::grub::grub_cmdline_linux: "cryptdevice=/dev/disk/by-uuid/63710ce5-bdfb-41a7-87dd-ae09ac79af67:cryptroot rootflags=subvol=@"
-arch_laptop_install::grub::grub_install_device: "/dev/sda"
-
-arch_laptop_install::hostname::hostname: "bacon"
-
-arch_laptop::network_wired::wired_interface: "ens32"
