@@ -54,11 +54,13 @@ fi
 
 # Load partition config
 source "${root_dir}/config.sh"
-[ -b $boot_part ] || die "\$boot_part: '${boot_part}' does not exist. See ${root_dir}/config.sh"
-[ -b $enc_part  ] || die "\$enc_part: '${enc_part}' does not exist. See ${root_dir}/config.sh"
+[ -b "${boot_part}" ] || die "\$boot_part: '${boot_part}' does not exist. See ${root_dir}/config.sh"
+[ -b "${enc_part}"  ] || die "\$enc_part: '${enc_part}' does not exist. See ${root_dir}/config.sh"
+[ -z "${puppet_repo_url}"  ] || die "\$puppet_repo_url: '${puppet_repo_url}' is not defined. See ${root_dir}/config.sh"
 echo "Arch installer configured with:"
 echo "boot_part=${boot_part}"
 echo "enc_part=${enc_part}"
+echo "arch_install_git_url=${arch_install_git_url}"
 echo "WARNING: Continuing the installation will WIPE ALL DATA on partitions above."
 read -p "Do you want to continue (y/N): " install_flag
 echo $install_flag
@@ -116,13 +118,28 @@ genfstab -p -U /mnt >> /mnt/etc/fstab
 # System setup prep
 ###############################################################################
 
-chroot_scripts=/mnt/root/puppet-arch-install
-bootstrap=${chroot_scripts}/chroot-puppet-bootstrap.sh
-cp -r ${root_dir} ${chroot_scripts}
+# update system, get git
+pacman --noconfirm -Syu
+pacman --noconfirm -S --needed base-devel
+pacman --noconfirm -S git
+
+# Get install scripts
+mkdir -p /mnt/opt/system && cd /mnt/opt/system
+git clone ${arch_install_git_url}
+latest=$(ls -1tr | tail -1)
+cd "${latest}"
+repo_dir="$(cd $(dirname $0) && pwd)"
+
+# Configure setup scripts
+bootstrap_config=${repo_dir}/chroot-puppet-bootstrap-config.sh
 crypt_dev_uuid=$(lsblk -o NAME,UUID | grep ${enc_part_name} | grep -v ${plain_part_name} | awk '{print $2}')
-sed -i 's|^crypt_dev=$|&'/dev/disk/by-uuid/${crypt_dev_uuid}'|' ${bootstrap}
-sed -i 's|^plain_part_name=$|&'${plain_part_name}'|' ${bootstrap}
-sed -i 's|^btrfs_root_vol=$|&'${btrfs_root_vol}'|' ${bootstrap}
-sed -i 's|^grub_install_dev=$|&'${boot_disk}'|' ${bootstrap}
-chmod u+x ${bootstrap}
-arch-chroot /mnt /bin/bash -c /root/puppet-arch-install/chroot-puppet-bootstrap.sh
+cat > ${bootstrap_config} <<EOF
+CRYPT_DEV=/dev/disk/by-uuid/${crypt_dev_uuid}
+PLAIN_PART_NAME=${plain_part_name}
+BTRFS_ROOT_VOL=${btrfs_root_vol}
+GRUB_INSTALL_DEV=${boot_disk}
+EOF
+
+chroot_repo_dir=$(echo $repo_dir | sed 's/^\/mnt//')
+chmod u+x ${chroot_repo_dir}/chroot-puppet-bootstrap.sh
+arch-chroot /mnt /bin/bash -c ${chroot_repo_dir}/chroot-puppet-bootstrap.sh && reboot

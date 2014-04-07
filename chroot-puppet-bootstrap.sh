@@ -20,10 +20,7 @@ function die {
 #   * puppet
 ###############################################################################
 
-echo "Enter password for root user"
-passwd
-
-# update system, get git
+# update system, verify git
 pacman --noconfirm -Syu
 pacman --noconfirm -S --needed base-devel
 pacman --noconfirm -S git
@@ -45,7 +42,7 @@ pacman --noconfirm -U *.tar.xz
 cd ..
 
 yaourt --noconfirm -Sa puppet
-
+yaourt --noconfirm -Sa ruby-hiera
 
 ###############################################################################
 # Full system configuration with puppet
@@ -53,39 +50,59 @@ yaourt --noconfirm -Sa puppet
 # Examine puppet-arch-install/puppet for details
 ###############################################################################
 
+echo "Enter password for root user"
+passwd
+
+# Load variables from configuration written during inital
+# 'arch-install.sh' phase.
+. ${root_dir}/chroot-puppet-bootstrap-config.sh
+[ -n "$CRYPT_DEV" ] || die "Error, CRYPT_DEV variable not defined."
+[ -n "$PLAIN_PART_NAME" ] || die "Error, PLAIN_PART_NAME variable not defined."
+[ -n "$BTRFS_ROOT_VOL" ] || die "Error, BTRFS_ROOT_VOL variable not defined."
+[ -n "$GRUB_INSTALL_DEV" ] || die "Error, GRUB_INSTALL_DEV variable not defined."
+
 # Read values for system configuration
-read -p "Enter hostname for new system: " hostname
+read -p "Enter hostname for new system: " HOSTNAME
 echo "Choose wired network interface to configure, see the following output of 'ip link' for reference"
 ip link
-read -p "Enter wired network interface name: " wired_ifname
+read -p "Enter wired network interface name: " WIRED_IFNAME
 
-# Export system config values for hieradata template
-export HOSTNAME=${hostname}
-export WIRED_IF=${wired_ifname}
-
-# Export templated variables
-# Note that enc_part_name is templated by arch-install.sh before this script is
-# run.
-crypt_dev=
-[ -n "$crypt_dev" ] || die "Error, crypt_dev variable not templated."
-plain_part_name=
-[ -n "$plain_part_name" ] || die "Error, plain_part_name variable not templated."
-btrfs_root_vol=
-[ -n "$btrfs_root_vol" ] || die "Error, btrfs_root_vol variable not templated."
-grub_install_dev=
-[ -n "$grub_install_dev" ] || die "Error, grub_install_dev variable not templated."
-
-export CRYPT_DEV=${crypt_dev}
-export PLAIN_PART_NAME=${plain_part_name}
-export BTRFS_ROOT_VOL=${btrfs_root_vol}
-export GRUB_INSTALL_DEV=${grub_install_dev}
+# Export configuratin for hieradata/system.yaml
+export CRYPT_DEV PLAIN_PART_NAME BTRFS_ROOT_VOL GRUB_INSTALL_DEV HOSTNAME WIRED_IFNAME
 
 # Render hieradata template
-hiera_system="${root_dir}/puppet/hieradata/system.yaml"
+hiera_system="${root_dir}/hiera/hieradata/system.yaml"
 erb "${hiera_system}.erb" > "${hiera_system}"
 
-# Run chroot puppet setup
-"${root_dir}/puppet/scripts/chroot_setup.sh"
+# Install symlinks to puppet modules and hiera data
+mkdir -p /etc/puppet/modules /etc/puppet/hieradata
+rm -f /etc/hiera.yaml
+ln -s ${root_dir}/hiera/hiera.yaml /etc/hiera.yaml
+ln -s /etc/hiera.yaml /etc/puppet/hiera.yaml
+ln -s ${root_dir}/hiera/hieradata/system.yaml /etc/puppet/hieradata/system.yaml
+for module in ${root_dir}/puppet/modules/*; do
+  ln -s ${module} /etc/puppet/modules/$(basename $module)
+done
+
+# Run install modules
+puppet apply <(echo include arch_laptop_install::augeas)
+puppet apply <(echo include arch_laptop_install)
+
+# Finish puppet setup
+augtool <<EOF
+set /files/etc/puppet/puppet.conf/main/server $HOSTNAME
+save
+EOF
+
+site_pp=${root_dir}/puppet/site.pp
+erb "${site_pp}.erb" > "${site_pp}"
+mkdir -p /etc/puppet/manifests
+ln -s "${site_pp}" /etc/puppet/manifests/site.pp
+
+chgrp -R puppet ${root_dir}
+
+systemctl enable puppetmaster
+systemctl enable puppet
 
 
 # TODO in arch_laptop_install module:
@@ -101,8 +118,6 @@ erb "${hiera_system}.erb" > "${hiera_system}"
 
 # TODO:
 # wifi
-# template grub config cryptdevice
-# template grub install device
 # sysctl, harden kernel
 # sysctl, deadline scheduler
 # firewall

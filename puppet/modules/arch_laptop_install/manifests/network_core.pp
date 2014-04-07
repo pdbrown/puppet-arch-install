@@ -1,4 +1,4 @@
-class arch_laptop::network_core ($wired_interface) {
+class arch_laptop_install::network_core ($wired_interface) {
 
   $dhcp_service = "dhcpcd@${wired_interface}.service"
 
@@ -8,7 +8,7 @@ class arch_laptop::network_core ($wired_interface) {
   }
   file {'/etc/resolvconf.conf':
     ensure  => file,
-    source  => "puppet:///modules/arch_laptop/network/resolvconf.conf",
+    source  => "puppet:///modules/arch_laptop_install/network/resolvconf.conf",
   }
 
   package {'dhcpcd':
@@ -17,7 +17,7 @@ class arch_laptop::network_core ($wired_interface) {
   }
   file {'/etc/dhcpcd.conf':
     ensure  => file,
-    source  => "puppet:///modules/arch_laptop/network/dhcpcd.conf",
+    source  => "puppet:///modules/arch_laptop_install/network/dhcpcd.conf",
   }
   service {"$dhcp_service":
     ensure    => running,
@@ -32,7 +32,7 @@ class arch_laptop::network_core ($wired_interface) {
   }
   file {'/etc/dnsmasq.conf':
     ensure  => file,
-    source  => "puppet:///modules/arch_laptop/network/dnsmasq.conf",
+    source  => "puppet:///modules/arch_laptop_install/network/dnsmasq.conf",
   }
   service {'dnsmasq':
     ensure    => running,
@@ -47,6 +47,6 @@ class arch_laptop::network_core ($wired_interface) {
   }
   file {'/etc/ssh/sshd_config':
     ensure  => file,
-    source  => "puppet:///modules/arch_laptop/network/sshd_config",
+    source  => "puppet:///modules/arch_laptop_install/network/sshd_config",
   }
 }

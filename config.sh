@@ -9,3 +9,9 @@ boot_part="/dev/sda1"
 
 # Encrypted partition. Will hold encrypted volume for rest of system.
 enc_part="/dev/sda2"
+
+# Puppet repo to clone. This repo must contain
+#     * puppet/modules
+#     * puppet/hieradata
+#     * chroot-puppet-bootstrap.sh
+arch_install_git_url=/opt/repos/puppet-install
