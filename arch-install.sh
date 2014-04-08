@@ -118,20 +118,8 @@ genfstab -p -U /mnt >> /mnt/etc/fstab
 # System setup prep
 ###############################################################################
 
-# update system, get git
-pacman --noconfirm -Syu
-pacman --noconfirm -S --needed base-devel
-pacman --noconfirm -S git
-
-# Get install scripts
-mkdir -p /mnt/opt/system && cd /mnt/opt/system
-git clone ${arch_install_git_url}
-latest=$(ls -1tr | tail -1)
-cd "${latest}"
-repo_dir="$(cd $(dirname $0) && pwd)"
-
 # Configure setup scripts
-bootstrap_config=${repo_dir}/chroot-puppet-bootstrap-config.sh
+bootstrap_config=${root_dir}/chroot-puppet-bootstrap-config.sh
 crypt_dev_uuid=$(lsblk -o NAME,UUID | grep ${enc_part_name} | grep -v ${plain_part_name} | awk '{print $2}')
 cat > ${bootstrap_config} <<EOF
 CRYPT_DEV=/dev/disk/by-uuid/${crypt_dev_uuid}
@@ -140,6 +128,8 @@ BTRFS_ROOT_VOL=${btrfs_root_vol}
 GRUB_INSTALL_DEV=${boot_disk}
 EOF
 
-chroot_repo_dir=$(echo $repo_dir | sed 's/^\/mnt//')
-chmod u+x ${chroot_repo_dir}/chroot-puppet-bootstrap.sh
-arch-chroot /mnt /bin/bash -c ${chroot_repo_dir}/chroot-puppet-bootstrap.sh && reboot
+chroot_root_dir="/mnt${root_dir}"
+mkdir -p $(dirname ${chroot_root_dir})
+cp -r "$root_dir" "$chroot_root_dir"
+chmod u+x "${chroot_root_dir}/chroot-puppet-bootstrap.sh"
+arch-chroot /mnt /bin/bash -c ${root_dir}/chroot-puppet-bootstrap.sh && reboot
