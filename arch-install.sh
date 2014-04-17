@@ -96,7 +96,7 @@ umount /mnt
 
 # Mount partitions
 mount ${plain_part} -o subvol=${btrfs_root_vol} /mnt
-mkdir /mnt/var /mnt/home /mnt/boot
+mkdir -p /mnt/var /mnt/home /mnt/boot
 
 mount ${plain_part} -o subvol=@var /mnt/var
 mount ${plain_part} -o subvol=@home /mnt/home

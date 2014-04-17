@@ -25,6 +25,8 @@ arch_install_git_url=/opt/repos/puppet-install
 # Bootstrap install
 
 root_dir=$(cd $(dirname $0) && pwd)
+
+pacman --noconfirm -Sy
 pacman --noconfirm -S git
 
 git clone ${arch_install_git_url}

@@ -26,7 +26,7 @@ pacman --noconfirm -S --needed base-devel
 pacman --noconfirm -S git
 
 # get package-query, yaourt, puppet
-mkdir ~/builds
+mkdir -p ~/builds
 cd ~/builds
 curl -O https://aur.archlinux.org/packages/pa/package-query/package-query.tar.gz
 curl -O https://aur.archlinux.org/packages/ya/yaourt/yaourt.tar.gz
