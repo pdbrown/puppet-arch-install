@@ -2,7 +2,7 @@
 # This script starts the post-chroot portion of the installation
 # It is sourced by the arch-install.sh script
 
-root_dir=$(cd $(dirname $0) && pwd)
+root_dir="$(cd "$(dirname "${0}")" && pwd)"
 
 function die {
   echo "$0 failed with: $1"
@@ -50,12 +50,17 @@ yaourt --noconfirm -Sa ruby-hiera
 # Examine puppet-arch-install/puppet for details
 ###############################################################################
 
+# Set locale
+sed -i 's/#\(en_US.UTF-8 UTF-8\)/\1/' /etc/locale.gen
+echo 'LANG="en_US.UTF-8"' > /etc/locale.conf
+locale-gen
+
 echo "Enter password for root user"
 passwd
 
 # Load variables from configuration written during inital
 # 'arch-install.sh' phase.
-. ${root_dir}/chroot-puppet-bootstrap-config.sh
+. "${root_dir}/chroot-puppet-bootstrap-config.sh"
 [ -n "$CRYPT_DEV" ] || die "Error, CRYPT_DEV variable not defined."
 [ -n "$PLAIN_PART_NAME" ] || die "Error, PLAIN_PART_NAME variable not defined."
 [ -n "$BTRFS_ROOT_VOL" ] || die "Error, BTRFS_ROOT_VOL variable not defined."
@@ -71,17 +76,17 @@ read -p "Enter wired network interface name: " WIRED_IFNAME
 export CRYPT_DEV PLAIN_PART_NAME BTRFS_ROOT_VOL GRUB_INSTALL_DEV HOSTNAME WIRED_IFNAME
 
 # Render hieradata template
-hiera_system="${root_dir}/hiera/hieradata/system.yaml"
+readonly hiera_system="${root_dir}/hiera/hieradata/system.yaml"
 erb "${hiera_system}.erb" > "${hiera_system}"
 
 # Install symlinks to puppet modules and hiera data
 mkdir -p /etc/puppet/modules /etc/puppet/hieradata
 rm -f /etc/hiera.yaml
-ln -s ${root_dir}/hiera/hiera.yaml /etc/hiera.yaml
+ln -s "${root_dir}/hiera/hiera.yaml" /etc/hiera.yaml
 ln -s /etc/hiera.yaml /etc/puppet/hiera.yaml
-ln -s ${root_dir}/hiera/hieradata/system.yaml /etc/puppet/hieradata/system.yaml
-for module in ${root_dir}/puppet/modules/*; do
-  ln -s ${module} /etc/puppet/modules/$(basename $module)
+ln -s "${root_dir}/hiera/hieradata/system.yaml" /etc/puppet/hieradata/system.yaml
+for module in "${root_dir}"/puppet/modules/*; do
+  ln -s "${module}" "/etc/puppet/modules/$(basename "${module}")"
 done
 
 # Run install modules
@@ -90,16 +95,16 @@ puppet apply <(echo include arch_laptop_install)
 
 # Finish puppet setup
 augtool <<EOF
-set /files/etc/puppet/puppet.conf/main/server $HOSTNAME
+set /files/etc/puppet/puppet.conf/main/server ${HOSTNAME}
 save
 EOF
 
-site_pp=${root_dir}/puppet/site.pp
+readonly site_pp="${root_dir}/puppet/site.pp"
 erb "${site_pp}.erb" > "${site_pp}"
 mkdir -p /etc/puppet/manifests
 ln -s "${site_pp}" /etc/puppet/manifests/site.pp
 
-chgrp -R puppet ${root_dir}
+chown -R puppet "${root_dir}"
 
 systemctl enable puppetmaster
 systemctl enable puppet

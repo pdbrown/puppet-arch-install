@@ -29,14 +29,14 @@
 #   5) run ./arch-install.sh
 
 function die {
-  echo "$0 failed with: $1"
+  echo "${0} failed with: ${1}"
   exit 1
 }
 
-root_dir=$(cd $(dirname $0) && pwd)
+readonly root_dir="$(cd "$(dirname "${0}")" && pwd)"
 read -p "This script will install arch linux. Do you want to continue (y/N): " install_flag
-echo $install_flag
-if [ "$install_flag" != y ] && [ "$install_flag" != Y ]; then
+echo "${install_flag}"
+if ! [[ "${install_flag}" =~ [yY] ]]; then
   exit 2
 fi
 
@@ -54,53 +54,49 @@ fi
 
 # Load partition config
 source "${root_dir}/config.sh"
-[ -b "${boot_part}" ] || die "\$boot_part: '${boot_part}' does not exist. See ${root_dir}/config.sh"
-[ -b "${enc_part}"  ] || die "\$enc_part: '${enc_part}' does not exist. See ${root_dir}/config.sh"
-[ -z "${puppet_repo_url}"  ] || die "\$puppet_repo_url: '${puppet_repo_url}' is not defined. See ${root_dir}/config.sh"
+[ -b "${BOOT_PART}" ] || die "\$boot_part: '${BOOT_PART}' does not exist. See ${root_dir}/config.sh"
+[ -b "${ENC_PART}" ] || die "\$enc_part: '${ENC_PART}' does not exist. See ${root_dir}/config.sh"
 echo "Arch installer configured with:"
-echo "boot_part=${boot_part}"
-echo "enc_part=${enc_part}"
-echo "arch_install_git_url=${arch_install_git_url}"
+echo "BOOT_PART=${BOOT_PART}"
+echo "ENC_PART=${ENC_PART}"
 echo "WARNING: Continuing the installation will WIPE ALL DATA on partitions above."
 read -p "Do you want to continue (y/N): " install_flag
 echo $install_flag
-if [ "$install_flag" != y ] && [ "$install_flag" != Y ]; then
+if ! [[ "${install_flag}" =~ [yY] ]]; then
   exit 2
 fi
 
-boot_disk=$(echo ${boot_part} | tr -d '[0-9]')
-boot_disk_name=$(basename ${boot_disk})
-boot_part_num=$(basename ${boot_part} | tr -d '[a-z]')
+readonly boot_disk="$(echo ${BOOT_PART} | tr -d '[0-9]')"
+readonly boot_disk_name="$(basename ${boot_disk})"
+readonly boot_part_num="$(basename ${BOOT_PART} | tr -d '[a-z]')"
+readonly enc_part_name="$(basename ${ENC_PART})"
+readonly plain_part_name="${enc_part_name}_crypt"
+readonly plain_part="/dev/mapper/${plain_part_name}"
 
-enc_part_name=$(basename ${enc_part})
-
-plain_part_name="${enc_part_name}_crypt"
-plain_part="/dev/mapper/${plain_part_name}"
-
-btrfs_root_vol=@
+readonly btrfs_root_vol=@
 
 # Create unencrypted /boot fs
-mkfs.ext4 ${boot_part}
+mkfs.ext4 "${BOOT_PART}"
 
 # Encrypt root device
-cryptsetup --use-random luksFormat ${enc_part}
-cryptsetup open ${enc_part} ${plain_part_name}
+cryptsetup --use-random luksFormat "${ENC_PART}"
+cryptsetup open "${ENC_PART}" "${plain_part_name}"
 
 # Create btrfs tank on plaintext partition, prepare subvolumes
-mkfs.btrfs -L tank ${plain_part}
-mount ${plain_part} /mnt
-btrfs subvolume create /mnt/${btrfs_root_vol}
-btrfs subvolume create /mnt/@var
-btrfs subvolume create /mnt/@home
+mkfs.btrfs -L tank "${plain_part}"
+mount "${plain_part}" /mnt
+btrfs subvolume create "/mnt/${btrfs_root_vol}"
+btrfs subvolume create "/mnt/@var"
+btrfs subvolume create "/mnt/@home"
 umount /mnt
 
 # Mount partitions
-mount ${plain_part} -o subvol=${btrfs_root_vol} /mnt
+mount "${plain_part}" -o subvol="${btrfs_root_vol}" /mnt
 mkdir -p /mnt/var /mnt/home /mnt/boot
 
-mount ${plain_part} -o subvol=@var /mnt/var
-mount ${plain_part} -o subvol=@home /mnt/home
-mount ${boot_part} /mnt/boot
+mount "${plain_part}" -o subvol=@var /mnt/var
+mount "${plain_part}" -o subvol=@home /mnt/home
+mount "${BOOT_PART}" /mnt/boot
 
 
 ###############################################################################
@@ -119,17 +115,17 @@ genfstab -p -U /mnt >> /mnt/etc/fstab
 ###############################################################################
 
 # Configure setup scripts
-bootstrap_config=${root_dir}/chroot-puppet-bootstrap-config.sh
-crypt_dev_uuid=$(lsblk -o NAME,UUID | grep ${enc_part_name} | grep -v ${plain_part_name} | awk '{print $2}')
-cat > ${bootstrap_config} <<EOF
-CRYPT_DEV=/dev/disk/by-uuid/${crypt_dev_uuid}
-PLAIN_PART_NAME=${plain_part_name}
-BTRFS_ROOT_VOL=${btrfs_root_vol}
-GRUB_INSTALL_DEV=${boot_disk}
+readonly bootstrap_config="${root_dir}/chroot-puppet-bootstrap-config.sh"
+readonly crypt_dev_uuid="$(lsblk -o NAME,UUID | grep "${enc_part_name}" | grep -v "${plain_part_name}" | awk '{print $2}')"
+cat > "${bootstrap_config}" <<EOF
+readonly CRYPT_DEV="/dev/disk/by-uuid/${crypt_dev_uuid}"
+readonly PLAIN_PART_NAME="${plain_part_name}"
+readonly BTRFS_ROOT_VOL="${btrfs_root_vol}"
+readonly GRUB_INSTALL_DEV="${boot_disk}"
 EOF
 
-chroot_root_dir="/mnt${root_dir}"
-mkdir -p $(dirname ${chroot_root_dir})
-cp -r "$root_dir" "$chroot_root_dir"
+readonly chroot_root_dir="/mnt${root_dir}"
+mkdir -p "$(dirname "${chroot_root_dir}")"
+cp -r "${root_dir}" "${chroot_root_dir}"
 chmod u+x "${chroot_root_dir}/chroot-puppet-bootstrap.sh"
-arch-chroot /mnt /bin/bash -c ${root_dir}/chroot-puppet-bootstrap.sh && reboot
+arch-chroot /mnt /bin/bash -c "${root_dir}/chroot-puppet-bootstrap.sh" && reboot

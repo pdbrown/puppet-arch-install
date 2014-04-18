@@ -5,13 +5,7 @@
 
 # Boot partition. Grub will be installed to this disk, so set the BIOS to boot
 # from it
-boot_part="/dev/sda1"
+test "${BOOT_PART}" || readonly BOOT_PART=/dev/sda1
 
 # Encrypted partition. Will hold encrypted volume for rest of system.
-enc_part="/dev/sda2"
-
-# Puppet repo to clone. This repo must contain
-#     * puppet/modules
-#     * puppet/hieradata
-#     * chroot-puppet-bootstrap.sh
-arch_install_git_url=/opt/repos/puppet-install
+test "${ENC_PART}" || readonly ENC_PART=/dev/sda2
