@@ -13,6 +13,8 @@
 #   4) Uses puppet modules to install the rest of the system.
 #
 # Instructions:
+#   See ./arch-install-boostrap
+# OR
 #   1) Boot arch iso on target machine
 #   2) Connect it to the internet
 #   3) Run the following:
@@ -54,9 +56,13 @@ fi
 
 # Load partition config
 source "${root_dir}/config.sh"
-[ -b "${BOOT_PART}" ] || die "\$boot_part: '${BOOT_PART}' does not exist. See ${root_dir}/config.sh"
-[ -b "${ENC_PART}" ] || die "\$enc_part: '${ENC_PART}' does not exist. See ${root_dir}/config.sh"
+[ -b "${BOOT_PART}" ] || die "\$BOOT_PART: '${BOOT_PART}' does not exist. See ${root_dir}/config.sh"
+[ -b "${ENC_PART}" ] || die "\$ENC_PART: '${ENC_PART}' does not exist. See ${root_dir}/config.sh"
+[ -n "${PUPPET_MODULE_REPO_URL}" ] || die "\$PUPPET_MODULE_REPO_URL is not defined. See ${root_dir}/config.sh"
+[ -n "${PUPPET_MODULE_REPO}" ] || die "\$PUPPET_MODULE_REPO is not defined. See ${root_dir}/config.sh"
 echo "Arch installer configured with:"
+echo "PUPPET_MODULE_REPO_URL=${PUPPET_MODULE_REPO_URL}"
+echo "PUPPET_MODULE_REPO=${PUPPET_MODULE_REPO}"
 echo "BOOT_PART=${BOOT_PART}"
 echo "ENC_PART=${ENC_PART}"
 echo "WARNING: Continuing the installation will WIPE ALL DATA on partitions above."
@@ -122,6 +128,8 @@ readonly CRYPT_DEV="/dev/disk/by-uuid/${crypt_dev_uuid}"
 readonly PLAIN_PART_NAME="${plain_part_name}"
 readonly BTRFS_ROOT_VOL="${btrfs_root_vol}"
 readonly GRUB_INSTALL_DEV="${boot_disk}"
+readonly PUPPET_MODULE_REPO_URL="${PUPPET_MODULE_REPO_URL}"
+readonly PUPPET_MODULE_REPO="${PUPPET_MODULE_REPO}"
 EOF
 
 readonly chroot_root_dir="/mnt${root_dir}"

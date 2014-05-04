@@ -1,0 +1,27 @@
+#!/bin/bash
+# This script installs arch linux using puppet. It clones the
+# puppet-arch-install repo, and runs arch the installer.
+
+# To use this script, create a ./config.sh that defines BOOT_PART, ENC_PART, and
+# PUPPET_MODULE_PATH (see the example provided config.sh), and set the
+# following:
+readonly PUPPET_INSTALL_REPO_URL=/opt/git/puppet-arch-install
+readonly PUPPET_INSTALL_REPO=/root/arch-install
+
+function die {
+  echo "${0} failed with: ${1}"
+  exit 1
+}
+
+readonly root_dir="$(cd "$(dirname "${0}")" && pwd)"
+config="${root_dir}/config.sh"
+source "${config}"
+[ -n "${PUPPET_MODULE_REPO}" ] || die "\$PUPPET_MODULE_REPO is not defined. See ${root_dir}/config.sh"
+[ "${PUPPET_MODULE_REPO}" != '/etc/puppet/modules' ] || die "\$PUPPET_MODULE_REPO shouldn't be set to /etc/puppet/modules. Symlinks from \$PUPPET_MODULE_REPO into /etc/puppet/modules are created instead."
+
+pacman --noconfirm -Sy
+pacman --noconfirm -S git
+
+git clone "${PUPPET_INSTALL_REPO_URL}" "${PUPPET_INSTALL_REPO}" || die "Couldn't clone ${PUPPET_INSTALL_REPO_URL} to ${PUPPET_INSTALL_REPO}"
+cp "${config}" "${PUPPET_INSTALL_REPO}" && cd "${PUPPET_INSTALL_REPO}"
+bash arch-install

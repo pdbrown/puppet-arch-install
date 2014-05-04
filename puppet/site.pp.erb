@@ -1,4 +1,3 @@
 node '<%= ENV['HOSTNAME'] %>' {
-  include arch_laptop_install
-  include arch_laptop
+<%= ENV['module_list'].split.map { |m| "  include #{m}" }.join("\n") %>
 }
