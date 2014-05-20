@@ -1,4 +1,0 @@
-t530_arch_system_core::grub::grub_cmdline_linux: "cryptdevice=<%= ENV['CRYPT_DEV'] %>:<%= ENV['PLAIN_PART_NAME'] %> rootflags=subvol=<%= ENV['BTRFS_ROOT_VOL'] %>"
-t530_arch_system_core::grub::grub_install_device: "<%= ENV['GRUB_INSTALL_DEV'] %>"
-t530_arch_system_core::hostname::hostname: "<%= ENV['HOSTNAME'] %>"
-t530_arch_system_core::network_core::wired_interface: "<%= ENV['WIRED_IFNAME'] %>"

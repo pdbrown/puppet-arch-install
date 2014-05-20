@@ -1,3 +1,0 @@
-node '<%= ENV['HOSTNAME'] %>' {
-<%= ENV['module_list'].split.map { |m| "  include #{m}" }.join("\n") %>
-}

@@ -1,5 +1,5 @@
 #!/bin/bash
-# This script installs arch linux using puppet. It:
+# This script installs Arch Linux using puppet. It:
 #   1) Takes two partitions specified in ./config.sh for:
 #       * An unencrypted boot partition (needs 300MB +- 200MB)
 #       * A btrfs on top of an encrypted partition (needs > 2GB):
@@ -31,11 +31,11 @@
 #   5) run ./arch-install.sh
 
 function die {
-  echo "${0} failed with: ${1}"
+  echo "$0 failed with: $1"
   exit 1
 }
 
-readonly root_dir="$(cd "$(dirname "${0}")" && pwd)"
+readonly root_dir="$(cd "$(dirname "$0")" && pwd)"
 read -p "This script will install arch linux. Do you want to continue (y/N): " install_flag
 echo "${install_flag}"
 if ! [[ "${install_flag}" =~ [yY] ]]; then
@@ -58,11 +58,12 @@ fi
 source "${root_dir}/config.sh"
 [ -b "${BOOT_PART}" ] || die "\$BOOT_PART: '${BOOT_PART}' does not exist. See ${root_dir}/config.sh"
 [ -b "${ENC_PART}" ] || die "\$ENC_PART: '${ENC_PART}' does not exist. See ${root_dir}/config.sh"
-[ -n "${PUPPET_MODULE_REPO_URL}" ] || die "\$PUPPET_MODULE_REPO_URL is not defined. See ${root_dir}/config.sh"
-[ -n "${PUPPET_MODULE_REPO}" ] || die "\$PUPPET_MODULE_REPO is not defined. See ${root_dir}/config.sh"
+[ -n "${PUPPET_SYSTEM_REPO_URL}" ] || die "\$PUPPET_SYSTEM_REPO_URL is not defined. See ${root_dir}/config.sh"
+[ -n "${PUPPET_SYSTEM_REPO}" ] || die "\$PUPPET_SYSTEM_REPO is not defined. See ${root_dir}/config.sh"
+[ "${PUPPET_SYSTEM_REPO}" != '/etc/puppet/modules' ] || die "\$PUPPET_SYSTEM_REPO shouldn't be set to /etc/puppet/modules. Symlinks from /etc/puppet/modules into \$PUPPET_SYSTEM_REPO are created instead."
 echo "Arch installer configured with:"
-echo "PUPPET_MODULE_REPO_URL=${PUPPET_MODULE_REPO_URL}"
-echo "PUPPET_MODULE_REPO=${PUPPET_MODULE_REPO}"
+echo "PUPPET_SYSTEM_REPO_URL=${PUPPET_SYSTEM_REPO_URL}"
+echo "PUPPET_SYSTEM_REPO=${PUPPET_SYSTEM_REPO}"
 echo "BOOT_PART=${BOOT_PART}"
 echo "ENC_PART=${ENC_PART}"
 echo "WARNING: Continuing the installation will WIPE ALL DATA on partitions above."
@@ -72,14 +73,16 @@ if ! [[ "${install_flag}" =~ [yY] ]]; then
   exit 2
 fi
 
-readonly boot_disk="$(echo ${BOOT_PART} | tr -d '[0-9]')"
-readonly boot_disk_name="$(basename ${boot_disk})"
-readonly boot_part_num="$(basename ${BOOT_PART} | tr -d '[a-z]')"
-readonly enc_part_name="$(basename ${ENC_PART})"
+readonly boot_disk="$(echo "${BOOT_PART}" | tr -d '[0-9]')"
+readonly boot_disk_name="$(basename "${boot_disk}")"
+readonly boot_part_num="$(basename "${BOOT_PART}" | tr -d '[a-z]')"
+readonly enc_part_name="$(basename "${ENC_PART}")"
 readonly plain_part_name="${enc_part_name}_crypt"
 readonly plain_part="/dev/mapper/${plain_part_name}"
 
 readonly btrfs_root_vol=@
+readonly btrfs_var_vol=@var
+readonly btrfs_home_vol=@home
 
 # Create unencrypted /boot fs
 mkfs.ext4 "${BOOT_PART}"
@@ -92,16 +95,16 @@ cryptsetup open "${ENC_PART}" "${plain_part_name}"
 mkfs.btrfs -L tank "${plain_part}"
 mount "${plain_part}" /mnt
 btrfs subvolume create "/mnt/${btrfs_root_vol}"
-btrfs subvolume create "/mnt/@var"
-btrfs subvolume create "/mnt/@home"
+btrfs subvolume create "/mnt/${btrfs_var_vol}"
+btrfs subvolume create "/mnt/${btrfs_home_vol}"
 umount /mnt
 
 # Mount partitions
 mount "${plain_part}" -o subvol="${btrfs_root_vol}" /mnt
 mkdir -p /mnt/var /mnt/home /mnt/boot
 
-mount "${plain_part}" -o subvol=@var /mnt/var
-mount "${plain_part}" -o subvol=@home /mnt/home
+mount "${plain_part}" -o subvol="${btrfs_var_vol}" /mnt/var
+mount "${plain_part}" -o subvol="${btrfs_home_vol}" /mnt/home
 mount "${BOOT_PART}" /mnt/boot
 
 
@@ -128,8 +131,8 @@ readonly CRYPT_DEV="/dev/disk/by-uuid/${crypt_dev_uuid}"
 readonly PLAIN_PART_NAME="${plain_part_name}"
 readonly BTRFS_ROOT_VOL="${btrfs_root_vol}"
 readonly GRUB_INSTALL_DEV="${boot_disk}"
-readonly PUPPET_MODULE_REPO_URL="${PUPPET_MODULE_REPO_URL}"
-readonly PUPPET_MODULE_REPO="${PUPPET_MODULE_REPO}"
+readonly PUPPET_SYSTEM_REPO_URL="${PUPPET_SYSTEM_REPO_URL}"
+readonly PUPPET_SYSTEM_REPO="${PUPPET_SYSTEM_REPO}"
 EOF
 
 readonly chroot_root_dir="/mnt${root_dir}"
