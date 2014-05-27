@@ -7,7 +7,7 @@ root_dir="$(cd "$(dirname "$0")" && pwd)"
 readonly AUR_URL=https://aur.archlinux.org/packages
 readonly CONFIG_VARS='CRYPT_DEV PLAIN_PART_NAME BTRFS_ROOT_VOL GRUB_INSTALL_DEV PUPPET_SYSTEM_REPO_URL PUPPET_SYSTEM_REPO'
 readonly HIERA_VARS="${CONFIG_VARS} HOSTNAME WIRED_IFNAME"
-readonly INSTALL_VARS="${HIERA_VARS} hiera_yaml hiera_system_yaml puppet_modules puppet_manifests"
+readonly INSTALL_VARS="${HIERA_VARS} hiera_yaml hiera_system_yaml puppet_modules puppet_manifests puppet_file"
 
 function die {
   echo "$0 failed with: $1"
@@ -36,6 +36,7 @@ function load_config {
   readonly hiera_system_yaml="${hiera_repo_dir}/hieradata/system.yaml"
   readonly puppet_modules="${PUPPET_SYSTEM_REPO}/modules"
   readonly puppet_manifests="${PUPPET_SYSTEM_REPO}/manifests"
+  readonly puppet_file="${PUPPET_SYSTEM_REPO}/Puppetfile"
 }
 
 function set_locale {
@@ -71,6 +72,7 @@ function install_yaourt {
 function install_puppet {
   yaourt --noconfirm -Sa puppet
   yaourt --noconfirm -Sa ruby-hiera
+  gem install --user-install librarian-puppet
 }
 
 function set_root_pw {
@@ -98,20 +100,30 @@ function configure_hiera {
   ln -s "${hiera_system_yaml}" /etc/puppet/hieradata/system.yaml
 }
 
-function configure_puppet {
-  test_config $INSTALL_VARS
-  mkdir -p /etc/puppet/modules
-  for module in "${puppet_modules}"/*; do
-    module_name="$(basename "${module}")"
-    module_list="${module_name} ${module_list}"
-    ln -s "${module}" "/etc/puppet/modules/${module_name}"
-  done
+function install_puppet_modules {
+  erb "${puppet_file}.erb" > "${puppet_file}"
+  ln -s "${puppet_file}" /etc/puppet/Puppetfile
+  gem_root="$(find /root/.gem -type d -name bin | grep -v gems | sort -V | tail -1)"
+  (cd /etc/puppet && "${gem_root}/librarian-puppet" install) || die "Failed to install puppet modules"
+}
 
-  export module_list
-  readonly site_pp="${puppet_manifests}/site.pp"
+function install_site_manifest {
+  local site_pp="${puppet_manifests}/site.pp"
   erb "${site_pp}.erb" > "${site_pp}"
   mkdir -p /etc/puppet/manifests
   ln -s "${site_pp}" /etc/puppet/manifests/site.pp
+}
+
+function setup_puppet {
+  export_vars $INSTALL_VARS
+  test_config $INSTALL_VARS
+  for module in "${puppet_modules}"/*; do
+    module_list="$(basename "${module}") ${module_list}"
+  done
+
+  export module_list
+  install_puppet_modules
+  install_site_manifest
 
   chown -R puppet:puppet /etc/puppet /var/lib/puppet "${PUPPET_SYSTEM_REPO}"
 
@@ -145,7 +157,7 @@ function main {
   network_config
 
   configure_hiera
-  configure_puppet
+  setup_puppet
 
   puppet_install_system
 
@@ -154,3 +166,22 @@ function main {
 }
 
 main
+
+
+# TODO in users module:
+# SUDO
+# USER phil
+# ADD to sudoers
+#salt=$(dd if=/dev/urandom | tr -dc '[:alnum:]' | head -c 16)
+## allow members of group 'sudo' to use sudo
+#sed -i 's/.*%\(sudo\s\+ALL=(ALL) ALL\)/\1/' /etc/sudoers
+# X config
+
+# Reboot
+# Run all puppet modules
+
+# TODO:
+# wifi
+
+# profile-sync-daemon in aur
+# xmonad
