@@ -135,6 +135,12 @@ readonly PUPPET_SYSTEM_REPO_URL="${PUPPET_SYSTEM_REPO_URL}"
 readonly PUPPET_SYSTEM_REPO="${PUPPET_SYSTEM_REPO}"
 EOF
 
+if echo "${PUPPET_SYSTEM_REPO_URL}" | grep -q '^/'; then # puppet system repo is local and needs to be copied into /mnt
+  readonly chroot_puppet_system_repo_parent="/mnt$(dirname "${PUPPET_SYSTEM_REPO_URL}")"
+  mkdir -p "${chroot_puppet_system_repo_parent}"
+  cp -r "${PUPPET_SYSTEM_REPO_URL}" "${chroot_puppet_system_repo_parent}"
+fi
+
 readonly chroot_root_dir="/mnt${root_dir}"
 mkdir -p "$(dirname "${chroot_root_dir}")"
 cp -r "${root_dir}" "${chroot_root_dir}"
