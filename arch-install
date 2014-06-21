@@ -133,13 +133,20 @@ readonly BTRFS_ROOT_VOL="${btrfs_root_vol}"
 readonly GRUB_INSTALL_DEV="${boot_disk}"
 readonly PUPPET_SYSTEM_REPO_URL="${PUPPET_SYSTEM_REPO_URL}"
 readonly PUPPET_SYSTEM_REPO="${PUPPET_SYSTEM_REPO}"
+readonly DOTFILES_REPO_URL="${DOTFILES_REPO_URL}"
 EOF
 
-if echo "${PUPPET_SYSTEM_REPO_URL}" | grep -q '^/'; then # puppet system repo is local and needs to be copied into /mnt
-  readonly chroot_puppet_system_repo_parent="/mnt$(dirname "${PUPPET_SYSTEM_REPO_URL}")"
-  mkdir -p "${chroot_puppet_system_repo_parent}"
-  cp -r "${PUPPET_SYSTEM_REPO_URL}" "${chroot_puppet_system_repo_parent}"
-fi
+function copy_local_repo_to_chroot {
+  local local_url="$1"
+  if echo "${local_url}" | grep -q '^/'; then # repo is local and needs to be copied into /mnt
+    readonly chroot_puppet_system_repo_parent="/mnt$(dirname "${local_url}")"
+    mkdir -p "${chroot_puppet_system_repo_parent}"
+    cp -r "${local_url}" "${chroot_puppet_system_repo_parent}"
+  fi
+}
+
+copy_local_repo_to_chroot "${PUPPET_SYSTEM_REPO_URL}"
+copy_local_repo_to_chroot "${DOTFILES_REPO_URL}"
 
 readonly chroot_root_dir="/mnt${root_dir}"
 mkdir -p "$(dirname "${chroot_root_dir}")"

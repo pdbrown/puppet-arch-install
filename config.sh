@@ -13,5 +13,8 @@ ENC_PART=/dev/sda2
 
 # Puppet module repository git url
 PUPPET_SYSTEM_REPO_URL=phil@192.168.1.115:/home/phil/arch/puppet-arch-system
-# Puppet module repository root absolute path, must contain ./modules
+# Puppet module repository root absolute path
 PUPPET_SYSTEM_REPO=/etc/puppet/system.git
+
+# Dotfiles for primary non-root user
+DOTFILES_REPO_URL=github.com:pdbrown/dotfiles.git

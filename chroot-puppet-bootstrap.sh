@@ -5,8 +5,8 @@
 root_dir="$(cd "$(dirname "$0")" && pwd)"
 
 readonly AUR_URL=https://aur.archlinux.org/packages
-readonly CONFIG_VARS='CRYPT_DEV PLAIN_PART_NAME BTRFS_ROOT_VOL GRUB_INSTALL_DEV PUPPET_SYSTEM_REPO_URL PUPPET_SYSTEM_REPO'
-readonly HIERA_VARS="${CONFIG_VARS} HOSTNAME WIRED_IFNAME"
+readonly CONFIG_VARS='CRYPT_DEV PLAIN_PART_NAME BTRFS_ROOT_VOL GRUB_INSTALL_DEV PUPPET_SYSTEM_REPO_URL PUPPET_SYSTEM_REPO DOTFILES_REPO_URL'
+readonly HIERA_VARS="${CONFIG_VARS} HOSTNAME WIRED_IFNAME WIRELESS_IFNAME"
 readonly INSTALL_VARS="${HIERA_VARS} hiera_yaml hiera_system_yaml puppet_modules puppet_manifests puppet_file"
 
 function die {
@@ -54,12 +54,15 @@ function install_boostrap_pkgs {
 function make_install_pkg {
   local pkg=$1
   local prefix="$(echo "${pkg}" | cut -c 1,2)"
-  mkdir -p ~/builds
-  cd ~/builds
-  curl -O "${AUR_URL}/${prefix}/${pkg}/${pkg}.tar.gz"
-  tar xf "${pkg}.tar.gz"
-  pushd "${pkg}"
-  makepkg --asroot --noconfirm -s
+  sudo -u yaourt bash -c "
+    mkdir -p ~/builds
+    cd ~/builds
+    curl -O "${AUR_URL}/${prefix}/${pkg}/${pkg}.tar.gz"
+    tar xf "${pkg}.tar.gz"
+    cd "${pkg}"
+    makepkg --noconfirm -s
+  "
+  pushd ~yaourt/builds/"${pkg}"
   pacman --noconfirm -U *.tar.xz
   popd
 }
@@ -67,6 +70,12 @@ function make_install_pkg {
 function install_yaourt {
   make_install_pkg package-query
   make_install_pkg yaourt
+  cat > /usr/local/bin/yaourt <<EOF
+#!/bin/bash
+sudo -u yaourt "$@"
+EOF
+  chmod 755 /usr/local/bin/yaourt
+  hash -r
 }
 
 function install_puppet {
@@ -85,6 +94,7 @@ function network_config {
   echo "Choose wired network interface to configure, see the following output of 'ip link' for reference"
   ip link
   read -p "Enter wired network interface name: " WIRED_IFNAME
+  read -p "Enter wireless network interface name: " WIRELESS_IFNAME
 }
 
 function configure_hiera {
@@ -101,7 +111,14 @@ function configure_hiera {
 }
 
 function install_puppet_modules {
-  erb "${puppet_file}.erb" > "${puppet_file}"
+  test_config $INSTALL_VARS
+  mkdir -p /etc/puppet/modules
+  for module in "${puppet_modules}"/*; do
+    ln -s "${module}" "/etc/puppet/modules/$(basename "${module}")"
+  done
+}
+
+function install_3rd_party_puppet_modules {
   ln -s "${puppet_file}" /etc/puppet/Puppetfile
   gem_root="$(find /root/.gem -type d -name bin | grep -v gems | sort -V | tail -1)"
   (cd /etc/puppet && "${gem_root}/librarian-puppet" install) || die "Failed to install puppet modules"
@@ -121,8 +138,10 @@ function setup_puppet {
     module_list="$(basename "${module}") ${module_list}"
   done
 
-  export module_list
+  install_3rd_party_puppet_modules
   install_puppet_modules
+
+  export module_list
   install_site_manifest
 
   chown -R puppet:puppet /etc/puppet /var/lib/puppet "${PUPPET_SYSTEM_REPO}"
@@ -149,6 +168,7 @@ function main {
   git clone "${PUPPET_SYSTEM_REPO_URL}" "${PUPPET_SYSTEM_REPO}" || die "Failed to clone ${PUPPET_SYSTEM_REPO_URL} to ${PUPPET_SYSTEM_REPO}"
 
   set_locale
+  useradd -m yaourt
   install_yaourt
   install_puppet
 
